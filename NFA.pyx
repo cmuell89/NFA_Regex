@@ -17,9 +17,9 @@ cdef char* re2post(str re):
         static char[8000]
         int nalt
         int natom
-        char* dst
+        char *dst
         re2post_anon paren[100]
-        p* re2post_anon
+        re2post_anon *p
 
     p = paren
     dst = buf
@@ -82,7 +82,7 @@ cdef char* re2post(str re):
             dst[0] = dst[0] + 1
             natom += natom
             break
-    if p != paren
+    if p != paren:
         return None
     while(--natom > 0):
         dst[0] = '.'
@@ -93,7 +93,48 @@ cdef char* re2post(str re):
     dst[0] = 0
     return buf
 
+"""
+Represents an NFA state plus zero or one or two arrows exiting.
+if c == Match, no arrows out; matching state.
+If c == Split, unlabeled arrows to out and out1 (if != NULL).
+If c < 256, labeled arrow with character c to out.
+"""
+
+cdef enum:
+    Match = 256
+    Split = 257
+
+cdef struct State:
+    int c
+    State *out
+    State *out1
+    int lastlist
+
+cdef State matchstate = {Match}
+cdef int nstate
 
 
+"""Allocate and initialize State """
+cdef State* state(int c, State *out, State *out1):
+    cdef State  s
+    nstate += nstate
+    s = malloc(sizeof(s[0]))
+    s.lastlist = 0
+    s.c = c
+    s.out = out
+    s.out1 = out1
+    return s
 
+"""
+A partially built NFA without the matching state filled in.
+Frag.start points at the start state.
+Frag.out is a list of places that need to be set to the next state for this fragment.
+"""
+cdef union Ptrlist:
+    Ptrlist *next
+    State *s
+
+cdef struct Frag:
+    State *start
+    Ptrlist *out
 
