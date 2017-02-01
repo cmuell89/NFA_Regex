@@ -2,6 +2,7 @@ cimport libc.stdlib
 cimport libc.stdio
 cimport libc.string
 cimport posix.unistd
+from libc.stdlib cimport malloc, free
 
 """
 Convert infix regexp re to postfix notation.
@@ -14,7 +15,7 @@ cdef struct re2post_anon:
 
 cdef char* re2post(str re):
     cdef:
-        static char[8000]
+        char[8000] buf
         int nalt
         int natom
         char *dst
@@ -26,16 +27,16 @@ cdef char* re2post(str re):
     dst_idx = 0
     nalt = 0
     natom = 0
-    if(len(re) >= (sizeof(buf)/2)):
+    if len(re) >= (sizeof(buf)/2):
         return None
     for chrctr in re:
         if chrctr == '(':
             if natom > 1:
-                natom = natom - 1
+                natom -= natom
                 """ *dst++ = '.'; CORRECT?"""
                 dst[0] = '.'
-                dst[0] = dst[0] + 1
-            if(p >= (paren+100)):
+                dst[0] += dst[0]
+            if p >= (paren+100):
                 return None
             p.nalt = nalt
             p.natom = natom
@@ -46,9 +47,9 @@ cdef char* re2post(str re):
         elif chrctr == '|':
             if natom == 0:
                 return None
-            while(--natom > 0):
+            while --natom > 0:
                 dst[0] = '.'
-                dst[0] = dst[0] + 1
+                dst[0] += dst[0]
             nalt += nalt
             break
         elif chrctr == ')':
@@ -58,10 +59,10 @@ cdef char* re2post(str re):
                 return None
             while(--natom):
                 dst[0] = '.'
-                dst[0] = dst[0] + 1
+                dst[0] += dst[0]
             while(nalt > 0):
                 dst[0] = '|'
-                dst[0] = dst[0] + 1
+                dst[0] += dst[0]
                 nalt -= nalt
             --p
             nalt = p.nalt
@@ -69,27 +70,27 @@ cdef char* re2post(str re):
             natom += natom
             break
         elif chrctr == '?':
-            if natom == 0
+            if natom == 0:
                 return None
             dst[0] = chrctr
-            dst[0] = dst[0] + 1
+            dst[0] += dst[0]
         else:
             if natom > 1:
                 --natom
                 dst[0] = '.'
-                dst[0] = dst[0] + 1
+                dst[0] += dst[0]
             dst[0] = chrctr
-            dst[0] = dst[0] + 1
+            dst[0] += dst[0]
             natom += natom
             break
     if p != paren:
         return None
-    while(--natom > 0):
+    while --natom > 0:
         dst[0] = '.'
-        dst[0] = dst[0] + 1
-    while(nalt > 0):
+        dst[0] += dst[0]
+    while nalt > 0:
         dst[0] = '|'
-        dst[0] = dst[0] + 1
+        dst[0] += dst[0]
     dst[0] = 0
     return buf
 
@@ -137,4 +138,25 @@ cdef union Ptrlist:
 cdef struct Frag:
     State *start
     Ptrlist *out
+
+"""
+Since the out pointers in the list are always uninitialized, we use the pointers themselves as storage for the Ptrlists.
+"""
+
+cdef union PtrList:
+    PtrList *next
+    State *s
+
+"""
+Create singleton list containing just outp.
+"""
+cdef Ptrlist* list1(State **outp):
+    cdef PtrList *l
+    l = (Ptrlist*)outp
+    l.next = None
+    return l
+
+cdef void patch(Ptrlist *l, State *s):
+	cdef Ptrlist *next
+
 
